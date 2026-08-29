@@ -10,5 +10,11 @@ export function getSupabaseBrowserClient() {
     )
   }
 
-  return createBrowserClient(url, anonKey)
+  try {
+    return createBrowserClient(url, anonKey)
+  } catch (cause) {
+    throw new Error(
+      `Failed to create Supabase client: ${cause instanceof Error ? cause.message : String(cause)}`
+    )
+  }
 }

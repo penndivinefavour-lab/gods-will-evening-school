@@ -19,7 +19,7 @@ export default function SignupPage() {
 
     try {
       const supabase = getSupabaseBrowserClient()
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -30,15 +30,33 @@ export default function SignupPage() {
       })
 
       if (signUpError) {
-        setError(signUpError.message)
+        // Normalize common auth errors into user-friendly messages.
+        const message =
+          signUpError.message ||
+          (signUpError.code === 'invalid_email'
+            ? 'The email address is not valid.'
+            : 'Sign up failed. Please try again.')
+
+        setError(message)
         return
       }
 
-      setMessage('Account created. You can sign in now.')
+      // Successful request: show account-created state.
+      // Some providers send a confirmation email before the user can sign in.
+      const sent = data?.user || data?.user?.email_confirmed_at ? true : false
+      if (data?.user) {
+        setMessage(sent ? 'Account created. You can sign in now.' : 'Account created. Check your email to confirm before signing in.')
+      } else {
+        setMessage('Account created. You can sign in now.')
+      }
       router.push('/login')
       router.refresh()
-    } catch {
-      setError('Unexpected error during sign up.')
+    } catch (cause) {
+      // Broad catch is a last-resort path; the auth SDK normally returns errors
+      // through the result tuple, not by throwing.
+      const message =
+        cause instanceof Error ? cause.message : 'Unexpected error during sign up.'
+      setError(message)
     }
   }
 
