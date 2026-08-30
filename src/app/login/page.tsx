@@ -26,10 +26,41 @@ export default function LoginPage() {
         return
       }
 
-      router.push('/dashboard')
-      router.refresh()
-    } catch {
-      setError('Unexpected login error')
+      // Wait for the browser auth client to settle its session before routing.
+      // The SSR browser client updates the session cookie asynchronously, so
+      // poll for the session before navigating to the dashboard.
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Sign in did not complete in time')), 8000)
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          clearTimeout(timer)
+          if (!session) reject(new Error('Sign in succeeded but no session was established'))
+          else resolve()
+        }).catch((cause) => {
+          clearTimeout(timer)
+          reject(cause instanceof Error ? cause : new Error(String(cause)))
+        })
+      })
+
+      // Verify the server-recognized session with a same-origin API probe,
+      // then route to the dashboard only after the probe succeeds.
+      try {
+        const probe = await fetch('/api/auth/me', {
+          method: 'GET',
+          credentials: 'same-origin',
+          headers: { 'Accept': 'application/json' },
+        })
+        if (!probe.ok) {
+          setError(`Sign in succeeded locally but the server did not recognize the session yet (probe status ${probe.status}). Please retry signing in.`)
+          return
+        }
+        router.push('/dashboard')
+        router.refresh()
+      } catch (probeFailure) {
+        setError(`Sign in succeeded locally but the server probe failed: ${probeFailure instanceof Error ? probeFailure.message : 'probe failed'}`)
+        return
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unexpected login error')
     }
   }
 
