@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase-server'
 import { getUserRoleContext } from '@/lib/auth'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const supabase = await getSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   
